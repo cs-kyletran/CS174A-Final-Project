@@ -10,19 +10,20 @@
         overflow: hidden;
       }
     </style>
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-      <div id="hud" style="
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      color: white;
-      font-family: Arial, sans-serif;
-      font-size: 18px;
-      z-index: 10;
-      ">
-    Press Enter to Start Game
-  </div>
+    <div id="hud" class="hud">
+      Press Enter to Start Game
+    </div>
+    <div id="health" class="health"
+      >
+    Health: 100/100
+    </div>
+    <div id="money" class="money"
+      >
+    Money: 500
+    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

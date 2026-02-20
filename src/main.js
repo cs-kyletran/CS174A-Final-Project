@@ -292,22 +292,44 @@ const mouse = new THREE.Vector2();
 let placingTower = false;
 let towerPreview = null;
 
+let stop = true;
+let fast = false;
+
 // Handle Placement Mode for Towers after Pressing "b"
 // and showing Tower Preview
 window.addEventListener("keydown", (event) => {
-  if (event.key === "b" && gamePhase === "building") {
-    placingTower = !placingTower;
+  switch (event.key) {
+    case 'b':
+      if (gamePhase === "building") {
+      placingTower = !placingTower;
 
-    if (placingTower) {
-      towerPreview = createTowerPreview();
-      scene.add(towerPreview);
-    } 
-    else {
-      if (towerPreview) {
-        scene.remove(towerPreview);
-        towerPreview = null;
+        if (placingTower) {
+          towerPreview = createTowerPreview();
+          scene.add(towerPreview);
+        } 
+        else {
+          if (towerPreview) {
+            scene.remove(towerPreview);
+            towerPreview = null;
+          }
+        }
       }
-    }
+    case 's' :
+      stop = !stop;
+      if (stop) {
+        clock.stop();
+      }
+      else {
+        clock.start();
+      }
+    case 'f' :
+      fast = !fast;
+      if (fast) {
+        speed *= 2;
+      }
+      else {
+        speed /= 2;
+      }
   }
 });
 
@@ -329,7 +351,11 @@ window.addEventListener("mousedown", () => {
 
   if (hits.length > 0) {
     const p = hits[0].point;
-    createTower(p.x, p.z);
+    if (currentMoney >= 100) {
+      currentMoney -= 100;
+      updateMoneyBar(currentMoney);
+      createTower(p.x, p.z);
+    }
   }
 });
 
@@ -395,6 +421,25 @@ function spawnWave(wave) {
     i * wave.spawnInterval); 
   }
   updateWaveHUD(currentWave + 1, waves.length);
+
+  currentMoney += 200;
+  updateMoneyBar(currentMoney);
+}
+
+// Healthbar
+const totalHealth = 100;
+let currentHealth = totalHealth;
+const healthBar = document.getElementById("health");
+
+function updateHealthBar(currentHealth, totalHealth) {
+  health.textContent = `Health: ${currentHealth} / ${totalHealth}`;
+}
+
+let currentMoney = 500;
+const moneyBar = document.getElementById("money");
+
+function updateMoneyBar(currentMoney) {
+  moneyBar.textContent = `Money: ${currentMoney}`;
 }
 
 // Handler for Pressing "Enter" to Start Next Wave
