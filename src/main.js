@@ -314,6 +314,7 @@ window.addEventListener("keydown", (event) => {
           }
         }
       }
+      break;
     case 's' :
       stop = !stop;
       if (stop) {
@@ -322,14 +323,16 @@ window.addEventListener("keydown", (event) => {
       else {
         clock.start();
       }
+      break;
     case 'f' :
       fast = !fast;
-      if (fast) {
-        speed *= 2;
+      if (fast === true) {
+        speed = 15;
       }
       else {
-        speed /= 2;
+        speed = 5;
       }
+      break;
   }
 });
 
