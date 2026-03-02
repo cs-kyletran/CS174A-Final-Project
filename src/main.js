@@ -176,6 +176,7 @@ const fence = new THREE.Mesh(
 );
 fence.position.set(0, 0.5, -20);
 scene.add(fence);
+const fenceBoundingBox = new THREE.Box3().setFromObject(fence);
 
 // Crystal Tower 
 function createTower(x, z) {
@@ -236,7 +237,9 @@ function createZombie(position) {
     leftPivot: null,
     rightPivot: null,
     pathSegment: 0,
-    t: 0
+    t: 0,
+    health: 100,
+    boundingBox: null
   };
 
   zombieMTLLoader.load("/models/zombie.mtl", (materials) => {
@@ -275,6 +278,10 @@ function createZombie(position) {
       zombieData.leftPivot = leftPivot;
       zombieData.rightPivot = rightPivot;
 
+      // Bounding box for collision detection with fence or projectiles
+      const zombie_bounding_box = new THREE.Box3().setFromObject(zombie);
+      zombieData.boundingBox = zombie_bounding_box;
+
       zombies.push(zombieData);
   
     });
@@ -292,7 +299,7 @@ const mouse = new THREE.Vector2();
 let placingTower = false;
 let towerPreview = null;
 
-let stop = true;
+let stop = false;
 let fast = false;
 
 // Handle Placement Mode for Towers after Pressing "b"
@@ -510,6 +517,23 @@ function animate() {
   const dt = clock.getDelta();
 
   animateZombies(dt);
+
+  const HEALTH_DECREMENT = 5;
+  for (let i = zombies.length - 1; i >= 0; i--) {
+    const zombie = zombies[i];
+
+    zombie.boundingBox.setFromObject(zombie.mesh);
+
+    if (zombie.boundingBox.intersectsBox(fenceBoundingBox)) {
+      scene.remove(zombie.mesh);
+      zombies.splice(i, 1);
+
+
+      currentHealth -= HEALTH_DECREMENT;
+      updateHealthBar(currentHealth, totalHealth);
+    }
+  }
+
   if (zombies.length > 0) {
     checkWaveComplete();
   }
