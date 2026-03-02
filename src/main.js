@@ -534,9 +534,8 @@ function animate() {
     }
   }
 
-  if (zombies.length > 0) {
-    checkWaveComplete();
-  }
+  checkWaveComplete();
+    
   updateTowerPreview();
 
   controls.update();
