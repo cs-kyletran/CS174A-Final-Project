@@ -264,7 +264,8 @@ function createZombie(position) {
     pathSegment: 0,
     t: 0,
     health: 100,
-    boundingBox: null
+    boundingBox: null,
+    healthbar: null
   };
 
   zombies.push(zombieData);
@@ -298,6 +299,30 @@ function createZombie(position) {
       zombie.add(rightPivot);
 
       scene.add(zombie);
+
+
+
+      // Create health bar
+      const bbox = new THREE.Box3().setFromObject(zombie);
+      const topWorldY = bbox.max.y;
+
+      // Convert top height to zombie-local Y (zombie is in world space)
+      const localTopY = (topWorldY - zombie.position.y) + 15; // small offset above head
+
+      const healthBarGeo = new THREE.PlaneGeometry(1.6, 0.2);
+      const healthBarMat = new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        side: THREE.DoubleSide
+      });
+      const healthBar = new THREE.Mesh(healthBarGeo, healthBarMat);
+
+      healthBar.position.set(0, localTopY, 0);
+      zombie.add(healthBar);
+
+      zombieData.healthBar = healthBar;
+      zombie.add(healthBar);
+
+      zombieData.healthBar = healthBar;
 
       zombieData.mesh = zombie;
       zombieData.leftArm = leftArm;
@@ -598,6 +623,12 @@ function updateProjectiles(dt) {
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const p = projectiles[i];
 
+    if (!p.target || !p.target.mesh) {
+      scene.remove(p.mesh);
+      projectiles.splice(i, 1);
+      continue;
+    }
+
     p.life -= dt;
     if (p.life <= 0 || !p.target || !p.target.mesh) {
       scene.remove(p.mesh);
@@ -612,6 +643,25 @@ function updateProjectiles(dt) {
     const dist = dir.length();
 
     if (dist < 0.35) {
+        p.target.health -= 25;
+
+      // Update health bar scale
+      if (p.target.healthBar) {
+        const ratio = Math.max(p.target.health / 100, 0);
+        p.target.healthBar.scale.x = ratio;
+      }
+
+      if (p.target.health <= 0) {
+      // remove mesh
+      scene.remove(p.target.mesh);
+
+      // remove data safely
+      const idx = zombies.indexOf(p.target);
+      if (idx !== -1) zombies.splice(idx, 1);
+
+      // prevent double-kill weirdness
+      p.target.mesh = null;
+    }
       // "hit": just despawn for v1
       scene.remove(p.mesh);
       projectiles.splice(i, 1);
@@ -630,6 +680,11 @@ function animate() {
   const dt = clock.getDelta();
 
   animateZombies(dt);
+  for (const z of zombies) {
+    if (z.healthBar && z.mesh) {
+      z.healthBar.lookAt(camera.position);
+    }
+  }
   updateTowers(dt);
   updateProjectiles(dt);
 
