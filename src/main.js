@@ -11,6 +11,10 @@ scene.background = new THREE.Color(0xaec6cf);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
 document.body.appendChild(renderer.domElement);
 
 // Camera 
@@ -25,6 +29,19 @@ controls.update();
 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 const dir = new THREE.DirectionalLight(0xffffff, 1);
 dir.position.set(10, 20, 10);
+
+dir.castShadow = true;
+
+dir.shadow.mapSize.width = 2048;
+dir.shadow.mapSize.height = 2048;
+
+dir.shadow.camera.near = 1;
+dir.shadow.camera.far = 100;
+dir.shadow.camera.left = -50;
+dir.shadow.camera.right = 50;
+dir.shadow.camera.top = 50;
+dir.shadow.camera.bottom = -50;
+
 scene.add(dir);
 
 // Ground
@@ -32,6 +49,7 @@ const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(200, 200),
   new THREE.MeshStandardMaterial({ color: 0x4caf50 })
 );
+ground.receiveShadow = true;
 ground.rotation.x = -Math.PI / 2;
 scene.add(ground);
 
@@ -157,6 +175,16 @@ path6.rotation.x = -Math.PI / 2; path6.position.set(-6, 0.01, 21); scene.add(pat
 const path7 = new THREE.Mesh(new THREE.PlaneGeometry(4, 6), new THREE.MeshStandardMaterial({ color: 0xc2b280 }));
 path7.rotation.x = -Math.PI / 2; path7.position.set(0, 0.01, 22); scene.add(path7);
 
+const pathMeshes = [path1, path2, path3, path4, path5, path6, path7];
+
+path1.receiveShadow = true;
+path2.receiveShadow = true;
+path3.receiveShadow = true;
+path4.receiveShadow = true;
+path5.receiveShadow = true;
+path6.receiveShadow = true;
+path7.receiveShadow = true;
+
 // Zombie Movement Path Vectors 
 const pathCenters = [
   new THREE.Vector3(0, 0, 24),    // Path7
@@ -199,6 +227,13 @@ function createTower(x, z) {
 
   group.add(base); 
   group.add(bigCrystal);
+
+  group.traverse(child => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
   
 
   group.position.set(x, 0.6, z);
@@ -276,6 +311,12 @@ function createZombie(position) {
 
     zombieOBJLoader.load("/models/zombie.obj", (object) => {
       const zombie = object;
+      zombie.traverse(child => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
       zombie.scale.set(0.2, 0.2, 0.2);
       zombie.position.copy(position);
 
@@ -418,16 +459,38 @@ window.addEventListener("mousedown", () => {
   if (gamePhase !== "building") return;
 
   raycaster.setFromCamera(mouse, camera);
-  const hits = raycaster.intersectObject(ground);
 
-  if (hits.length > 0) {
-    const p = hits[0].point;
-    if (currentMoney >= 100) {
-      currentMoney -= 100;
-      updateMoneyBar(currentMoney);
-      createTower(p.x, p.z);
-    }
+  // 1) Where on the ground did we click?
+  const groundHits = raycaster.intersectObject(ground);
+  if (groundHits.length === 0) return;
+  const p = groundHits[0].point;
+
+  // 2) Did the ray hit a path mesh at (almost) the same spot?
+  const pathHits = raycaster.intersectObjects(pathMeshes);
+
+  // If we hit a path, and that hit is very close in distance to the ground hit,
+  // then the click is on the path area -> block tower placement.
+  if (pathHits.length > 0) {
+    const d = Math.abs(pathHits[0].distance - groundHits[0].distance);
+    if (d < 0.2) return;  // blocks placing on path
   }
+
+  // block pond
+  const pondHits = raycaster.intersectObject(pond);
+  if (pondHits.length > 0) {
+    const d = Math.abs(pondHits[0].distance - groundHits[0].distance);
+    if (d < 0.2) return;
+  }
+
+  // place tower
+  if (currentMoney < TOWER_COST) {
+    flashHudMessage("Not enough money!");
+    return;
+  }
+
+  currentMoney -= TOWER_COST;
+  updateMoneyBar(currentMoney);
+  createTower(p.x, p.z);
 });
 
 // Handles the Tower Preview's Position
@@ -462,6 +525,17 @@ const hud = document.getElementById("hud");
 
 function updateWaveHUD(currentWave, totalWaves) {
   hud.textContent = `Wave ${currentWave}/${totalWaves}`;
+}
+
+function flashHudMessage(msg) {
+  if (!hud) return;
+
+  const old = hud.textContent;
+  hud.textContent = msg;
+
+  setTimeout(() => {
+    hud.textContent = old;
+  }, 800);
 }
 
 let speed = 5;
@@ -574,7 +648,7 @@ function animateZombies(dt) {
 
 const TOWER_FIRE_COOLDOWN = 0.75; // seconds between shots
 const TOWER_RANGE = 100;          // how far towers can shoot
-
+const TOWER_COST = 100;
 
 function updateTowers(dt) {
   // Don't rely on gamePhase while debugging:
