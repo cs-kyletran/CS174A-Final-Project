@@ -178,6 +178,9 @@ fence.position.set(0, 0.5, -20);
 scene.add(fence);
 const fenceBoundingBox = new THREE.Box3().setFromObject(fence);
 
+const towers = [];
+const projectiles = [];
+
 // Crystal Tower 
 function createTower(x, z) {
   const group = new THREE.Group();
@@ -200,6 +203,8 @@ function createTower(x, z) {
 
   group.position.set(x, 0.6, z);
   scene.add(group);
+
+  towers.push(group);
   return group;
 }
 
@@ -220,6 +225,23 @@ function createTowerPreview() {
 
   return square;
 }
+
+function spawnProjectile(fromPos, targetZombie) {
+  const geom = new THREE.SphereGeometry(0.18, 12, 12);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x00ffff });
+  const mesh = new THREE.Mesh(geom, mat);
+
+  mesh.position.copy(fromPos);
+  scene.add(mesh);
+
+  projectiles.push({
+    mesh,
+    target: targetZombie,
+    speed: 18,
+    life: 2.0,
+  });
+}
+
 
 // Zombie Object and Material Creation 
 const zombieOBJLoader = new OBJLoader();
@@ -339,6 +361,15 @@ window.addEventListener("keydown", (event) => {
       else {
         speed = 5;
       }
+      break;
+    case 'p' :
+      if (towers.length === 0) break;
+      const target = zombies.find(z => z.mesh);
+      if (!target || !target.mesh) break;
+      const tower = towers[towers.length - 1];
+      const from = new THREE.Vector3().copy(tower.position);
+      from.y = 1.2;
+      spawnProjectile(from, target);
       break;
   }
 });
@@ -511,12 +542,44 @@ function animateZombies(dt) {
   });
 }
 
+// Update loop for projectiles
+function updateProjectiles(dt) {
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const p = projectiles[i];
+
+    p.life -= dt;
+    if (p.life <= 0 || !p.target || !p.target.mesh) {
+      scene.remove(p.mesh);
+      projectiles.splice(i, 1);
+      continue;
+    }
+
+    const targetPos = new THREE.Vector3().copy(p.target.mesh.position);
+    targetPos.y = 0.8;
+
+    const dir = targetPos.clone().sub(p.mesh.position);
+    const dist = dir.length();
+
+    if (dist < 0.35) {
+      // "hit": just despawn for v1
+      scene.remove(p.mesh);
+      projectiles.splice(i, 1);
+      continue;
+    }
+
+    dir.normalize();
+    p.mesh.position.addScaledVector(dir, p.speed * dt);
+  }
+}
+
+
 // Outer Animation Control Loop
 function animate() {
   requestAnimationFrame(animate);
   const dt = clock.getDelta();
 
   animateZombies(dt);
+  updateProjectiles(dt);
 
   const HEALTH_DECREMENT = 5;
   for (let i = zombies.length - 1; i >= 0; i--) {
