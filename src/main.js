@@ -204,7 +204,10 @@ function createTower(x, z) {
   group.position.set(x, 0.6, z);
   scene.add(group);
 
-  towers.push(group);
+  towers.push({
+    mesh: group,
+    cooldown: 0
+  });
   return group;
 }
 
@@ -264,6 +267,8 @@ function createZombie(position) {
     boundingBox: null
   };
 
+  zombies.push(zombieData);
+
   zombieMTLLoader.load("/models/zombie.mtl", (materials) => {
     materials.preload();
     zombieOBJLoader.setMaterials(materials);
@@ -304,7 +309,7 @@ function createZombie(position) {
       const zombie_bounding_box = new THREE.Box3().setFromObject(zombie);
       zombieData.boundingBox = zombie_bounding_box;
 
-      zombies.push(zombieData);
+      //zombies.push(zombieData);
   
     });
   });
@@ -367,7 +372,7 @@ window.addEventListener("keydown", (event) => {
       const target = zombies.find(z => z.mesh);
       if (!target || !target.mesh) break;
       const tower = towers[towers.length - 1];
-      const from = new THREE.Vector3().copy(tower.position);
+      const from = new THREE.Vector3().copy(tower.mesh.position);
       from.y = 1.2;
       spawnProjectile(from, target);
       break;
@@ -542,6 +547,52 @@ function animateZombies(dt) {
   });
 }
 
+const TOWER_FIRE_COOLDOWN = 0.75; // seconds between shots
+const TOWER_RANGE = 100;          // how far towers can shoot
+
+
+function updateTowers(dt) {
+  // Don't rely on gamePhase while debugging:
+  // if (gamePhase !== "zombie") return;
+
+  if (zombies.length === 0) return;
+  if (towers.length === 0) return;
+
+  for (const t of towers) {
+    // Support BOTH formats:
+    // 1) old: t is a THREE.Group
+    // 2) new: t is { mesh, cooldown }
+    const mesh = t.mesh ?? t;
+
+    // Cooldown handling for both formats
+    if (t.cooldown === undefined) t.cooldown = 0;
+    t.cooldown -= dt;
+    if (t.cooldown > 0) continue;
+
+    // Find nearest zombie with a loaded mesh
+    let bestZombie = null;
+    let bestDist = Infinity;
+
+    for (const z of zombies) {
+      if (!z.mesh) continue;
+
+      const d = mesh.position.distanceTo(z.mesh.position);
+      if (d < bestDist && d <= TOWER_RANGE) {
+        bestDist = d;
+        bestZombie = z;
+      }
+    }
+
+    if (!bestZombie) continue;
+
+    const from = new THREE.Vector3().copy(mesh.position);
+    from.y = 1.2;
+    spawnProjectile(from, bestZombie);
+
+    t.cooldown = TOWER_FIRE_COOLDOWN;
+  }
+}
+
 // Update loop for projectiles
 function updateProjectiles(dt) {
   for (let i = projectiles.length - 1; i >= 0; i--) {
@@ -579,11 +630,13 @@ function animate() {
   const dt = clock.getDelta();
 
   animateZombies(dt);
+  updateTowers(dt);
   updateProjectiles(dt);
 
   const HEALTH_DECREMENT = 5;
   for (let i = zombies.length - 1; i >= 0; i--) {
     const zombie = zombies[i];
+    if (!zombie.mesh || !zombie.boundingBox) continue;
 
     zombie.boundingBox.setFromObject(zombie.mesh);
 
@@ -591,13 +644,14 @@ function animate() {
       scene.remove(zombie.mesh);
       zombies.splice(i, 1);
 
-
       currentHealth -= HEALTH_DECREMENT;
       updateHealthBar(currentHealth, totalHealth);
     }
   }
 
-  checkWaveComplete();
+  if (gamePhase === "zombie") {
+    checkWaveComplete();
+  }
     
   updateTowerPreview();
 
