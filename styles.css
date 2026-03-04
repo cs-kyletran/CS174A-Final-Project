@@ -30,3 +30,19 @@
     font-size: 18px;
     user-select: none;
 }
+
+.gameover {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+
+    display: none;
+    justify-content: center;
+    align-items: center;
+    color: black;
+
+    font-size: 40px;
+    user-select: none;
+}

@@ -432,7 +432,8 @@ function spawnWave(wave) {
   }
   updateWaveHUD(currentWave + 1, waves.length);
 
-  currentMoney += 200;
+  const MONEY_DECREMENT = 200;
+  currentMoney += MONEY_DECREMENT;
   updateMoneyBar(currentMoney);
 }
 
@@ -442,14 +443,21 @@ let currentHealth = totalHealth;
 const healthBar = document.getElementById("health");
 
 function updateHealthBar(currentHealth, totalHealth) {
-  health.textContent = `Health: ${currentHealth} / ${totalHealth}`;
+  healthBar.textContent = `Health: ${currentHealth} / ${totalHealth}`;
 }
 
+// Money
 let currentMoney = 500;
 const moneyBar = document.getElementById("money");
 
 function updateMoneyBar(currentMoney) {
   moneyBar.textContent = `Money: ${currentMoney}`;
+}
+
+// Game Over Screen
+const gameOverScreen = document.getElementById("gameover");
+function gameOver() {
+  gameOverScreen.style.display = "flex";
 }
 
 // Handler for Pressing "Enter" to Start Next Wave
@@ -511,14 +519,8 @@ function animateZombies(dt) {
   });
 }
 
-// Outer Animation Control Loop
-function animate() {
-  requestAnimationFrame(animate);
-  const dt = clock.getDelta();
-
-  animateZombies(dt);
-
-  const HEALTH_DECREMENT = 5;
+function collisionDetection() {
+  const HEALTH_DECREMENT = 10;
   for (let i = zombies.length - 1; i >= 0; i--) {
     const zombie = zombies[i];
 
@@ -531,9 +533,24 @@ function animate() {
 
       currentHealth -= HEALTH_DECREMENT;
       updateHealthBar(currentHealth, totalHealth);
+
+      if (currentHealth <= 0) {
+        gameOver();
+      }
     }
   }
+}
 
+// Outer Animation Control Loop
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+
+  animateZombies(dt);
+
+  collisionDetection();
+
+  // need to reimplement exclusive building in building phase
   checkWaveComplete();
     
   updateTowerPreview();
