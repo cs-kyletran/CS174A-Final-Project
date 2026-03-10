@@ -11,6 +11,10 @@ scene.background = new THREE.Color(0xaec6cf);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
 document.body.appendChild(renderer.domElement);
 
 // Camera 
@@ -25,6 +29,19 @@ controls.update();
 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 const dir = new THREE.DirectionalLight(0xffffff, 1);
 dir.position.set(10, 20, 10);
+
+dir.castShadow = true;
+
+dir.shadow.mapSize.width = 2048;
+dir.shadow.mapSize.height = 2048;
+
+dir.shadow.camera.near = 1;
+dir.shadow.camera.far = 100;
+dir.shadow.camera.left = -50;
+dir.shadow.camera.right = 50;
+dir.shadow.camera.top = 50;
+dir.shadow.camera.bottom = -50;
+
 scene.add(dir);
 
 // Ground
@@ -32,6 +49,7 @@ const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(200, 200),
   new THREE.MeshStandardMaterial({ color: 0x4caf50 })
 );
+ground.receiveShadow = true;
 ground.rotation.x = -Math.PI / 2;
 scene.add(ground);
 
@@ -157,6 +175,16 @@ path6.rotation.x = -Math.PI / 2; path6.position.set(-6, 0.01, 21); scene.add(pat
 const path7 = new THREE.Mesh(new THREE.PlaneGeometry(4, 6), new THREE.MeshStandardMaterial({ color: 0xc2b280 }));
 path7.rotation.x = -Math.PI / 2; path7.position.set(0, 0.01, 22); scene.add(path7);
 
+const pathMeshes = [path1, path2, path3, path4, path5, path6, path7];
+
+path1.receiveShadow = true;
+path2.receiveShadow = true;
+path3.receiveShadow = true;
+path4.receiveShadow = true;
+path5.receiveShadow = true;
+path6.receiveShadow = true;
+path7.receiveShadow = true;
+
 // Zombie Movement Path Vectors 
 const pathCenters = [
   new THREE.Vector3(0, 0, 24),    // Path7
@@ -178,6 +206,9 @@ fence.position.set(0, 0.5, -20);
 scene.add(fence);
 const fenceBoundingBox = new THREE.Box3().setFromObject(fence);
 
+const towers = [];
+const projectiles = [];
+
 // Crystal Tower 
 function createTower(x, z) {
   const group = new THREE.Group();
@@ -196,10 +227,22 @@ function createTower(x, z) {
 
   group.add(base); 
   group.add(bigCrystal);
+
+  group.traverse(child => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
   
 
   group.position.set(x, 0.6, z);
   scene.add(group);
+
+  towers.push({
+    mesh: group,
+    cooldown: 0
+  });
   return group;
 }
 
@@ -221,6 +264,23 @@ function createTowerPreview() {
   return square;
 }
 
+function spawnProjectile(fromPos, targetZombie) {
+  const geom = new THREE.SphereGeometry(0.18, 12, 12);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x00ffff });
+  const mesh = new THREE.Mesh(geom, mat);
+
+  mesh.position.copy(fromPos);
+  scene.add(mesh);
+
+  projectiles.push({
+    mesh,
+    target: targetZombie,
+    speed: 18,
+    life: 2.0,
+  });
+}
+
+
 // Zombie Object and Material Creation 
 const zombieOBJLoader = new OBJLoader();
 const zombieMTLLoader = new MTLLoader();
@@ -239,8 +299,11 @@ function createZombie(position) {
     pathSegment: 0,
     t: 0,
     health: 100,
-    boundingBox: null
+    boundingBox: null,
+    healthbar: null
   };
+
+  zombies.push(zombieData);
 
   zombieMTLLoader.load("/models/zombie.mtl", (materials) => {
     materials.preload();
@@ -248,6 +311,12 @@ function createZombie(position) {
 
     zombieOBJLoader.load("/models/zombie.obj", (object) => {
       const zombie = object;
+      zombie.traverse(child => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
       zombie.scale.set(0.2, 0.2, 0.2);
       zombie.position.copy(position);
 
@@ -272,6 +341,30 @@ function createZombie(position) {
 
       scene.add(zombie);
 
+
+
+      // Create health bar
+      const bbox = new THREE.Box3().setFromObject(zombie);
+      const topWorldY = bbox.max.y;
+
+      // Convert top height to zombie-local Y (zombie is in world space)
+      const localTopY = (topWorldY - zombie.position.y) + 15; // small offset above head
+
+      const healthBarGeo = new THREE.PlaneGeometry(1.6, 0.2);
+      const healthBarMat = new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        side: THREE.DoubleSide
+      });
+      const healthBar = new THREE.Mesh(healthBarGeo, healthBarMat);
+
+      healthBar.position.set(0, localTopY, 0);
+      zombie.add(healthBar);
+
+      zombieData.healthBar = healthBar;
+      zombie.add(healthBar);
+
+      zombieData.healthBar = healthBar;
+
       zombieData.mesh = zombie;
       zombieData.leftArm = leftArm;
       zombieData.rightArm = rightArm;
@@ -282,7 +375,7 @@ function createZombie(position) {
       const zombie_bounding_box = new THREE.Box3().setFromObject(zombie);
       zombieData.boundingBox = zombie_bounding_box;
 
-      zombies.push(zombieData);
+      //zombies.push(zombieData);
   
     });
   });
@@ -340,6 +433,15 @@ window.addEventListener("keydown", (event) => {
         speed = 5;
       }
       break;
+    case 'p' :
+      if (towers.length === 0) break;
+      const target = zombies.find(z => z.mesh);
+      if (!target || !target.mesh) break;
+      const tower = towers[towers.length - 1];
+      const from = new THREE.Vector3().copy(tower.mesh.position);
+      from.y = 1.2;
+      spawnProjectile(from, target);
+      break;
   }
 });
 
@@ -357,16 +459,38 @@ window.addEventListener("mousedown", () => {
   if (gamePhase !== "building") return;
 
   raycaster.setFromCamera(mouse, camera);
-  const hits = raycaster.intersectObject(ground);
 
-  if (hits.length > 0) {
-    const p = hits[0].point;
-    if (currentMoney >= 100) {
-      currentMoney -= 100;
-      updateMoneyBar(currentMoney);
-      createTower(p.x, p.z);
-    }
+  // 1) Where on the ground did we click?
+  const groundHits = raycaster.intersectObject(ground);
+  if (groundHits.length === 0) return;
+  const p = groundHits[0].point;
+
+  // 2) Did the ray hit a path mesh at (almost) the same spot?
+  const pathHits = raycaster.intersectObjects(pathMeshes);
+
+  // If we hit a path, and that hit is very close in distance to the ground hit,
+  // then the click is on the path area -> block tower placement.
+  if (pathHits.length > 0) {
+    const d = Math.abs(pathHits[0].distance - groundHits[0].distance);
+    if (d < 0.2) return;  // blocks placing on path
   }
+
+  // block pond
+  const pondHits = raycaster.intersectObject(pond);
+  if (pondHits.length > 0) {
+    const d = Math.abs(pondHits[0].distance - groundHits[0].distance);
+    if (d < 0.2) return;
+  }
+
+  // place tower
+  if (currentMoney < TOWER_COST) {
+    flashHudMessage("Not enough money!");
+    return;
+  }
+
+  currentMoney -= TOWER_COST;
+  updateMoneyBar(currentMoney);
+  createTower(p.x, p.z);
 });
 
 // Handles the Tower Preview's Position
@@ -401,6 +525,17 @@ const hud = document.getElementById("hud");
 
 function updateWaveHUD(currentWave, totalWaves) {
   hud.textContent = `Wave ${currentWave}/${totalWaves}`;
+}
+
+function flashHudMessage(msg) {
+  if (!hud) return;
+
+  const old = hud.textContent;
+  hud.textContent = msg;
+
+  setTimeout(() => {
+    hud.textContent = old;
+  }, 800);
 }
 
 let speed = 5;
@@ -511,16 +646,126 @@ function animateZombies(dt) {
   });
 }
 
+const TOWER_FIRE_COOLDOWN = 0.75; // seconds between shots
+const TOWER_RANGE = 100;          // how far towers can shoot
+const TOWER_COST = 100;
+
+function updateTowers(dt) {
+  // Don't rely on gamePhase while debugging:
+  // if (gamePhase !== "zombie") return;
+
+  if (zombies.length === 0) return;
+  if (towers.length === 0) return;
+
+  for (const t of towers) {
+    // Support BOTH formats:
+    // 1) old: t is a THREE.Group
+    // 2) new: t is { mesh, cooldown }
+    const mesh = t.mesh ?? t;
+
+    // Cooldown handling for both formats
+    if (t.cooldown === undefined) t.cooldown = 0;
+    t.cooldown -= dt;
+    if (t.cooldown > 0) continue;
+
+    // Find nearest zombie with a loaded mesh
+    let bestZombie = null;
+    let bestDist = Infinity;
+
+    for (const z of zombies) {
+      if (!z.mesh) continue;
+
+      const d = mesh.position.distanceTo(z.mesh.position);
+      if (d < bestDist && d <= TOWER_RANGE) {
+        bestDist = d;
+        bestZombie = z;
+      }
+    }
+
+    if (!bestZombie) continue;
+
+    const from = new THREE.Vector3().copy(mesh.position);
+    from.y = 1.2;
+    spawnProjectile(from, bestZombie);
+
+    t.cooldown = TOWER_FIRE_COOLDOWN;
+  }
+}
+
+// Update loop for projectiles
+function updateProjectiles(dt) {
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const p = projectiles[i];
+
+    if (!p.target || !p.target.mesh) {
+      scene.remove(p.mesh);
+      projectiles.splice(i, 1);
+      continue;
+    }
+
+    p.life -= dt;
+    if (p.life <= 0 || !p.target || !p.target.mesh) {
+      scene.remove(p.mesh);
+      projectiles.splice(i, 1);
+      continue;
+    }
+
+    const targetPos = new THREE.Vector3().copy(p.target.mesh.position);
+    targetPos.y = 0.8;
+
+    const dir = targetPos.clone().sub(p.mesh.position);
+    const dist = dir.length();
+
+    if (dist < 0.35) {
+        p.target.health -= 25;
+
+      // Update health bar scale
+      if (p.target.healthBar) {
+        const ratio = Math.max(p.target.health / 100, 0);
+        p.target.healthBar.scale.x = ratio;
+      }
+
+      if (p.target.health <= 0) {
+      // remove mesh
+      scene.remove(p.target.mesh);
+
+      // remove data safely
+      const idx = zombies.indexOf(p.target);
+      if (idx !== -1) zombies.splice(idx, 1);
+
+      // prevent double-kill weirdness
+      p.target.mesh = null;
+    }
+      // "hit": just despawn for v1
+      scene.remove(p.mesh);
+      projectiles.splice(i, 1);
+      continue;
+    }
+
+    dir.normalize();
+    p.mesh.position.addScaledVector(dir, p.speed * dt);
+  }
+}
+
+
 // Outer Animation Control Loop
 function animate() {
   requestAnimationFrame(animate);
   const dt = clock.getDelta();
 
   animateZombies(dt);
+  for (const z of zombies) {
+    if (z.healthBar && z.mesh) {
+      z.healthBar.lookAt(camera.position);
+    }
+  }
+  updateTowers(dt);
+  updateProjectiles(dt);
 
   const HEALTH_DECREMENT = 5;
   for (let i = zombies.length - 1; i >= 0; i--) {
     const zombie = zombies[i];
+    if (!zombie.mesh || !zombie.boundingBox) continue;
 
     zombie.boundingBox.setFromObject(zombie.mesh);
 
@@ -528,13 +773,14 @@ function animate() {
       scene.remove(zombie.mesh);
       zombies.splice(i, 1);
 
-
       currentHealth -= HEALTH_DECREMENT;
       updateHealthBar(currentHealth, totalHealth);
     }
   }
 
-  checkWaveComplete();
+  if (gamePhase === "zombie") {
+    checkWaveComplete();
+  }
     
   updateTowerPreview();
 
