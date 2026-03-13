@@ -977,6 +977,10 @@ function resetGame() {
   gamePhase = "building";
   gameOver = false;
 
+  waveSpawning = false;
+  zombiesToSpawn = 0;
+  spawnTimer = 0;
+
   hud.textContent = "Press Enter to Start Game";
 
   hideGameOver();
