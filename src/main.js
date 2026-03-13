@@ -44,6 +44,7 @@ dir.shadow.camera.bottom = -50;
 
 scene.add(dir);
 
+// Loading all Textures
 const textureLoader = new THREE.TextureLoader();
 
 const grassColor = textureLoader.load("/textures/grass_diffuse.jpg")
@@ -52,6 +53,7 @@ const grassRough = textureLoader.load("/textures/grass_rough.jpg")
 const pathColor = textureLoader.load("/textures/path_diffuse.jpg")
 const pathNormal = textureLoader.load("/textures/path_normal.jpg")
 const pathRough = textureLoader.load("/textures/path_rough.jpg")
+const water = textureLoader.load("/textures/water.png")
 
 grassColor.wrapS = THREE.RepeatWrapping;
 grassColor.wrapT = THREE.RepeatWrapping;
@@ -68,9 +70,13 @@ grassRough.wrapT = THREE.RepeatWrapping;
 pathRough.wrapS = THREE.RepeatWrapping;
 pathRough.wrapT = THREE.RepeatWrapping;
 
+water.wrapS = THREE.RepeatWrapping;
+water.wrapT = THREE.RepeatWrapping;
+
 grassColor.repeat.set(50, 50);
 grassNormal.repeat.set(50, 50);
 grassRough.repeat.set(50, 50);
+water.repeat.set(5, 5);
 
 // Create Path Function for Varaible Texture Mapping based of Path Dimensions
 function createPath(width, height, x, y, z, repeatFactor = 1) {
@@ -109,7 +115,7 @@ scene.add(ground);
 // Pond
 const pond = new THREE.Mesh(
   new THREE.CircleGeometry(4, 32),
-  new THREE.MeshStandardMaterial({ color: 0x2196f3 })
+  new THREE.MeshStandardMaterial({ map: water })
 );
 pond.rotation.x = -Math.PI / 2;
 pond.position.set(8, 0.01, 19);
@@ -460,7 +466,7 @@ window.addEventListener("keydown", (event) => {
   switch (event.key) {
     case 'b':
       if (gamePhase === "building") {
-      placingTower = !placingTower;
+        placingTower = !placingTower;
 
         if (placingTower) {
           towerPreview = createTowerPreview();
@@ -574,11 +580,11 @@ function updateTowerPreview() {
 // Wave Variables
 let currentWave = 0;
 const waves = [
-  { count: 4, spawnInterval: 2000, money: 100 },
-  { count: 6, spawnInterval: 1700, money: 200},
-  { count: 9, spawnInterval: 1500, money: 200},
-  { count: 11, spawnInterval: 1500, money: 300},
-  { count: 14, spawnInterval: 1500, money: 400}
+  { count: 4, spawnInterval: 2000, money: 100, speed: 5 },
+  { count: 6, spawnInterval: 1700, money: 200, speed: 7},
+  { count: 9, spawnInterval: 1500, money: 200, speed: 10},
+  { count: 11, spawnInterval: 1500, money: 300, speed: 13},
+  { count: 14, spawnInterval: 1500, money: 400, speed: 16}
 ];
 
 // HUD Update Function
@@ -599,7 +605,25 @@ function flashHudMessage(msg) {
   }, 800);
 }
 
-let speed = 5;
+// Game Over Screen Function
+const gameOverScreen = document.getElementById("game-over-screen");
+gameOverScreen.style.display = "none";
+
+function showGameOver() {
+  gameOverScreen.style.display = "block";
+}
+
+function hideGameOver() {
+  gameOverScreen.style.display = "none";
+}
+
+function triggerGameOver() {
+  gameOver = true;
+  clock.stop();
+  showGameOver();
+}
+
+let speed = 0;
 // Wave Spawning Function 
 function spawnWave(wave) {
   gamePhase = "zombie"; 
@@ -608,7 +632,7 @@ function spawnWave(wave) {
     scene.remove(towerPreview);
     towerPreview = null;
   }
-  speed += 5;
+  speed = wave.speed;
 
   let spawned = 0;
   for (let i = 0; i < wave.count; i++) {
@@ -652,6 +676,7 @@ function updateMoneyBar(currentMoney) {
 window.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     if (gamePhase === "building" && currentWave < waves.length) {
+      placingTower = false;
       spawnWave(waves[currentWave]);
       currentWave++; 
     }
@@ -808,6 +833,41 @@ function updateProjectiles(dt) {
   }
 }
 
+// Game Reset Logic
+window.addEventListener("keydown", (event) => {
+  if (event.key === "r" || event.key === "R") {
+    if (gameOver) {
+      resetGame();
+    }
+  }
+});
+
+function resetGame() {
+  currentHealth = totalHealth;
+  updateHealthBar(currentHealth, totalHealth);
+
+  zombies.forEach(z => {
+    if (z.mesh) scene.remove(z.mesh);
+  });
+  zombies.length = 0; 
+
+  projectiles.forEach(p => scene.remove(p.mesh));
+  projectiles.length = 0;
+
+  currentWave = 0;
+  updateWaveHUD(0, waves.length);
+  gamePhase = "building";
+  gameOver = false;
+
+  hud.textContent = "Press Enter to Start Game";
+
+  hideGameOver();
+
+  clock.start();
+
+  currentMoney = 100;
+  updateMoneyBar(currentMoney);
+}
 
 // Outer Animation Control Loop
 function animate() {
@@ -823,7 +883,7 @@ function animate() {
   updateTowers(dt);
   updateProjectiles(dt);
 
-  const HEALTH_DECREMENT = 5;
+  const HEALTH_DECREMENT = 20;
   for (let i = zombies.length - 1; i >= 0; i--) {
     const zombie = zombies[i];
     if (!zombie.mesh || !zombie.boundingBox) continue;
@@ -836,6 +896,10 @@ function animate() {
 
       currentHealth -= HEALTH_DECREMENT;
       updateHealthBar(currentHealth, totalHealth);
+
+      if (currentHealth <= 0 && !gameOver) {
+        triggerGameOver();
+      }
     }
   }
 
