@@ -414,7 +414,7 @@ function createZombie(position) {
       // Convert top height to zombie-local Y (zombie is in world space)
       const localTopY = (topWorldY - zombie.position.y) + 15; // small offset above head
 
-      const healthBarGeo = new THREE.PlaneGeometry(1.6, 0.2);
+      const healthBarGeo = new THREE.PlaneGeometry(3.2, 0.4);
       const healthBarMat = new THREE.MeshBasicMaterial({
         color: 0xff0000,
         side: THREE.DoubleSide
