@@ -580,11 +580,11 @@ function updateTowerPreview() {
 // Wave Variables
 let currentWave = 0;
 const waves = [
-  { count: 4, spawnInterval: 2000, money: 100, speed: 5 },
-  { count: 6, spawnInterval: 1700, money: 200, speed: 7},
-  { count: 9, spawnInterval: 1500, money: 200, speed: 10},
-  { count: 11, spawnInterval: 1500, money: 300, speed: 13},
-  { count: 14, spawnInterval: 1500, money: 400, speed: 16}
+  { count: 4, spawnInterval: 2000, money: 100, speed: 7 },
+  { count: 6, spawnInterval: 1700, money: 200, speed: 10},
+  { count: 9, spawnInterval: 1500, money: 200, speed: 14},
+  { count: 11, spawnInterval: 1500, money: 300, speed: 18},
+  { count: 14, spawnInterval: 1500, money: 400, speed: 22}
 ];
 
 // HUD Update Function
@@ -607,6 +607,20 @@ function flashHudMessage(msg) {
 
 // Game Over Screen Function
 const gameOverScreen = document.getElementById("game-over-screen");
+
+// Styling Game Over Message (wouldn't work when I put it in style.css)
+gameOverScreen.style.color = "#ff4444"; 
+gameOverScreen.style.fontSize = "3rem";
+gameOverScreen.style.fontWeight = "bold";
+gameOverScreen.style.textAlign = "center";
+gameOverScreen.style.position = "fixed";
+gameOverScreen.style.top = "50%";
+gameOverScreen.style.left = "50%";
+gameOverScreen.style.transform = "translate(-50%, -50%)";
+gameOverScreen.style.zIndex = "9999";
+gameOverScreen.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
+gameOverScreen.style.border = "3px solid #ff4444";
+gameOverScreen.style.padding = "20px";
 gameOverScreen.style.display = "none";
 
 function showGameOver() {
