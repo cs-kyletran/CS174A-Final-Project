@@ -44,10 +44,33 @@ dir.shadow.camera.bottom = -50;
 
 scene.add(dir);
 
+const textureLoader = new THREE.TextureLoader();
+
+const grassColor = textureLoader.load("/textures/grass_diffuse.jpg")
+const grassNormal = textureLoader.load("/textures/grass_normal.jpg")
+const grassRough = textureLoader.load("/textures/grass_rough.jpg")
+
+grassColor.wrapS = THREE.RepeatWrapping;
+grassColor.wrapT = THREE.RepeatWrapping;
+
+grassNormal.wrapS = THREE.RepeatWrapping;
+grassNormal.wrapT = THREE.RepeatWrapping;
+
+grassRough.wrapS = THREE.RepeatWrapping;
+grassRough.wrapT = THREE.RepeatWrapping;
+
+grassColor.repeat.set(50, 50);
+grassNormal.repeat.set(50, 50);
+grassRough.repeat.set(50, 50);
+
 // Ground
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(200, 200),
-  new THREE.MeshStandardMaterial({ color: 0x4caf50 })
+  new THREE.MeshStandardMaterial({
+  map: grassColor,
+  normalMap: grassNormal,
+  roughnessMap: grassRough
+  })
 );
 ground.receiveShadow = true;
 ground.rotation.x = -Math.PI / 2;
@@ -83,6 +106,12 @@ function createTree(x, z, trunkHeight = 2, trunkRadius = 0.3, leavesRadius = 1) 
 
   // Position the tree
   group.position.set(x, 0, z);
+  group.traverse(child => {
+  if (child.isMesh) {
+    child.castShadow = true;
+    child.receiveShadow = true;
+  }
+  });
   scene.add(group);
 
   return group;
@@ -137,11 +166,17 @@ function createBush(x, z) {
         });
       }
     });
-      const bush = object;
-      bush.scale.set(0.7, 0.7, 0.7);
-      bush.position.set(x, 0, z); 
+    const bush = object;
+    bush.scale.set(0.7, 0.7, 0.7);
+    bush.position.set(x, 0, z); 
+    object.traverse(child => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+    });
 
-      scene.add(bush);
+    scene.add(bush);
     });
 }
 
@@ -385,6 +420,7 @@ function createZombie(position) {
 
 // Game Phase Managment
 let gamePhase = "building";
+let gameOver = false;
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -515,9 +551,11 @@ function updateTowerPreview() {
 // Wave Variables
 let currentWave = 0;
 const waves = [
-  { count: 4, spawnInterval: 2000 },
-  { count: 6, spawnInterval: 1500 },
-  { count: 9, spawnInterval: 1000 }
+  { count: 4, spawnInterval: 2000, money: 100 },
+  { count: 6, spawnInterval: 1700, money: 200},
+  { count: 9, spawnInterval: 1500, money: 200},
+  { count: 11, spawnInterval: 1500, money: 300},
+  { count: 14, spawnInterval: 1500, money: 400}
 ];
 
 // HUD Update Function
@@ -567,7 +605,7 @@ function spawnWave(wave) {
   }
   updateWaveHUD(currentWave + 1, waves.length);
 
-  currentMoney += 200;
+  currentMoney += wave.money;
   updateMoneyBar(currentMoney);
 }
 
@@ -580,7 +618,7 @@ function updateHealthBar(currentHealth, totalHealth) {
   health.textContent = `Health: ${currentHealth} / ${totalHealth}`;
 }
 
-let currentMoney = 500;
+let currentMoney = 100;
 const moneyBar = document.getElementById("money");
 
 function updateMoneyBar(currentMoney) {
