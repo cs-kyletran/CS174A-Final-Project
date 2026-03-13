@@ -964,6 +964,11 @@ function resetGame() {
   });
   zombies.length = 0; 
 
+  towers.forEach(t => {
+    if (t.mesh) scene.remove(t.mesh);
+  });
+  towers.length = 0;
+
   projectiles.forEach(p => scene.remove(p.mesh));
   projectiles.length = 0;
 
