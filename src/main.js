@@ -280,7 +280,7 @@ const towers = [];
 const projectiles = [];
 
 // Crystal Tower 
-function createTower(x, z) {
+function createTower(x, z, range = 15) {
   const group = new THREE.Group();
   const base = new THREE.Mesh(
     new THREE.CylinderGeometry(0.8, 1, 1.2, 16),
@@ -311,14 +311,18 @@ function createTower(x, z) {
 
   towers.push({
     mesh: group,
-    cooldown: 0
+    cooldown: 0,
+    range: range,
+    radius: TOWER_RADIUS
   });
   return group;
 }
 
 // Tower Preview before Placing
-function createTowerPreview() {
+function createTowerPreview(range = TOWER_RANGE) {
+  const previewTower = new THREE.Group();
 
+  // Tower Placement Square
   const geo = new THREE.PlaneGeometry(2, 2); 
   const mat = new THREE.MeshBasicMaterial({
     color: 0x00FFFF,
@@ -329,9 +333,26 @@ function createTowerPreview() {
 
   const square = new THREE.Mesh(geo, mat);
   square.rotation.x = -Math.PI / 2; 
-  square.position.y = 0.02;   
+  square.position.y = 0.02;
+  previewTower.add(square);
 
-  return square;
+  // Range Indicator Circle
+  const rangeGeo = new THREE.RingGeometry(range - 0.1, range, 64);
+  const rangeMat = new THREE.MeshBasicMaterial({
+    color: 0x00FFFF,
+    transparent: true,
+    opacity: 0.2,
+    side: THREE.DoubleSide
+  });
+  const rangeCircle = new THREE.Mesh(rangeGeo, rangeMat);
+  rangeCircle.rotation.x = -Math.PI / 2;
+  rangeCircle.position.y = 0.01;
+  previewTower.add(rangeCircle);
+
+  previewTower.range = range;
+  previewTower.rangeCircle = rangeCircle;
+
+  return previewTower;
 }
 
 function spawnProjectile(fromPos, targetZombie) {
@@ -478,7 +499,7 @@ window.addEventListener("keydown", (event) => {
         placingTower = !placingTower;
 
         if (placingTower) {
-          towerPreview = createTowerPreview();
+          towerPreview = createTowerPreview(TOWER_RANGE);
           scene.add(towerPreview);
         } 
         else {
@@ -809,7 +830,8 @@ function animateZombies(dt) {
 }
 
 const TOWER_FIRE_COOLDOWN = 0.75; // seconds between shots
-const TOWER_RANGE = 100;          // how far towers can shoot
+const TOWER_RANGE = 10;          // how far towers can shoot
+const TOWER_RADIUS = 1.5;
 const TOWER_COST = 100;
 const BASE_PROJECTILE_SPEED = 18;
 const BASE_PROJECTILE_LIFE = 2.0;
@@ -840,7 +862,7 @@ function updateTowers(dt) {
       if (!z.mesh) continue;
 
       const d = mesh.position.distanceTo(z.mesh.position);
-      if (d < bestDist && d <= TOWER_RANGE) {
+      if (d < bestDist && d <= (t.range ?? TOWER_RANGE)) {
         bestDist = d;
         bestZombie = z;
       }
