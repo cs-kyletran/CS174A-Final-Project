@@ -26,7 +26,8 @@ controls.target.set(0, 0, 9.1);
 controls.update();
 
 // Lights
-scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambientLight);
 const dir = new THREE.DirectionalLight(0xffffff, 1);
 dir.position.set(10, 20, 10);
 
@@ -708,6 +709,27 @@ window.addEventListener("keydown", (event) => {
   }
 });
 
+function setNightMode() {
+  scene.background = new THREE.Color(0x0b132b);
+
+  ambientLight.intensity = 0.2;
+
+  dir.color.set(0x9bbcff);
+  dir.intensity = 0.5;
+  ground.material.color.set(0x728f6e);
+}
+
+function setDayMode() {
+  scene.background = new THREE.Color(0xaec6cf);
+
+  ambientLight.intensity = 1;
+
+  dir.color.set(0xffffff);
+  dir.intensity = 1;
+
+  ground.material.color.set(0x97e08d);
+}
+
 // Check handler to see if Wave is Complete
 function checkWaveComplete() {
   if (zombies.length > 0) return;
@@ -952,7 +974,11 @@ function animate() {
   }
 
   if (gamePhase === "zombie") {
+    setNightMode();
     checkWaveComplete();
+  }
+  else if (gamePhase == "building") {
+    setDayMode();
   }
     
   updateTowerPreview();
