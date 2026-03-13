@@ -49,19 +49,49 @@ const textureLoader = new THREE.TextureLoader();
 const grassColor = textureLoader.load("/textures/grass_diffuse.jpg")
 const grassNormal = textureLoader.load("/textures/grass_normal.jpg")
 const grassRough = textureLoader.load("/textures/grass_rough.jpg")
+const pathColor = textureLoader.load("/textures/path_diffuse.jpg")
+const pathNormal = textureLoader.load("/textures/path_normal.jpg")
+const pathRough = textureLoader.load("/textures/path_rough.jpg")
 
 grassColor.wrapS = THREE.RepeatWrapping;
 grassColor.wrapT = THREE.RepeatWrapping;
+pathColor.wrapS = THREE.RepeatWrapping;
+pathColor.wrapT = THREE.RepeatWrapping;
 
 grassNormal.wrapS = THREE.RepeatWrapping;
 grassNormal.wrapT = THREE.RepeatWrapping;
+pathNormal.wrapS = THREE.RepeatWrapping;
+pathNormal.wrapT = THREE.RepeatWrapping;
 
 grassRough.wrapS = THREE.RepeatWrapping;
 grassRough.wrapT = THREE.RepeatWrapping;
+pathRough.wrapS = THREE.RepeatWrapping;
+pathRough.wrapT = THREE.RepeatWrapping;
 
 grassColor.repeat.set(50, 50);
 grassNormal.repeat.set(50, 50);
 grassRough.repeat.set(50, 50);
+
+// Create Path Function for Varaible Texture Mapping based of Path Dimensions
+function createPath(width, height, x, y, z, repeatFactor = 1) {
+    const mat = new THREE.MeshStandardMaterial({
+        map: pathColor.clone(),
+        normalMap: pathNormal.clone(),
+        roughnessMap: pathRough.clone()
+    });
+
+    mat.map.repeat.set(width * repeatFactor, height * repeatFactor);
+    mat.normalMap.repeat.set(width * repeatFactor, height * repeatFactor);
+    mat.roughnessMap.repeat.set(width * repeatFactor, height * repeatFactor);
+
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, y, z);
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+
+    return mesh;
+}
 
 // Ground
 const ground = new THREE.Mesh(
@@ -189,26 +219,19 @@ createBush(-20, 21);
 createBush(34, -5);
 
 // Path 1-7
-const path1 = new THREE.Mesh(new THREE.PlaneGeometry(4, 20), new THREE.MeshStandardMaterial({ color: 0xc2b280 }));
-path1.rotation.x = -Math.PI / 2; path1.position.set(0, 0.01, -10); scene.add(path1);
+const pathMaterial = new THREE.MeshStandardMaterial({
+  map: pathColor,
+  normalMap: pathNormal,
+  roughnessMap: pathRough
+});
 
-const path2 = new THREE.Mesh(new THREE.PlaneGeometry(16, 4), new THREE.MeshStandardMaterial({ color: 0xc2b280 }));
-path2.rotation.x = -Math.PI / 2; path2.position.set(6, 0.01, 2); scene.add(path2);
-
-const path3 = new THREE.Mesh(new THREE.PlaneGeometry(4, 10), new THREE.MeshStandardMaterial({ color: 0xc2b280 }));
-path3.rotation.x = -Math.PI / 2; path3.position.set(12, 0.01, 8); scene.add(path3);
-
-const path4 = new THREE.Mesh(new THREE.PlaneGeometry(20, 4), new THREE.MeshStandardMaterial({ color: 0xc2b280 }));
-path4.rotation.x = -Math.PI / 2; path4.position.set(0, 0.01, 11); scene.add(path4);
-
-const path5 = new THREE.Mesh(new THREE.PlaneGeometry(4, 6), new THREE.MeshStandardMaterial({ color: 0xc2b280 }));
-path5.rotation.x = -Math.PI / 2; path5.position.set(-8, 0.01, 16); scene.add(path5);
-
-const path6 = new THREE.Mesh(new THREE.PlaneGeometry(8, 4), new THREE.MeshStandardMaterial({ color: 0xc2b280 }));
-path6.rotation.x = -Math.PI / 2; path6.position.set(-6, 0.01, 21); scene.add(path6);
-
-const path7 = new THREE.Mesh(new THREE.PlaneGeometry(4, 6), new THREE.MeshStandardMaterial({ color: 0xc2b280 }));
-path7.rotation.x = -Math.PI / 2; path7.position.set(0, 0.01, 22); scene.add(path7);
+const path1 = createPath(4, 20, 0, 0.01, -10, 0.5);
+const path2 = createPath(16, 4, 6, 0.01, 2, 0.5);
+const path3 = createPath(4, 10, 12, 0.01, 8, 0.5);
+const path4 = createPath(20, 4, 0, 0.01, 11, 0.5);
+const path5 = createPath(4, 6, -8, 0.01, 16, 0.5);
+const path6 = createPath(8, 4, -6, 0.01, 21, 0.5);
+const path7 = createPath(4, 6, 0, 0.01, 22, 0.5);
 
 const pathMeshes = [path1, path2, path3, path4, path5, path6, path7];
 
