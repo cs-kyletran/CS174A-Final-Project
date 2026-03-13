@@ -356,7 +356,7 @@ const zombieOBJLoader = new OBJLoader();
 const zombieMTLLoader = new MTLLoader();
 const zombies = []; 
 
-function createZombie(position) {
+function createZombie(position, health = 100) {
   // Store zombie data before zombie mesh is fully loaded,
   // so you have the object reference before the mesh is
   // loaded
@@ -412,6 +412,7 @@ function createZombie(position) {
       scene.add(zombie);
 
 
+      zombieData.health = health;
 
       // Create health bar
       const bbox = new THREE.Box3().setFromObject(zombie);
@@ -597,11 +598,11 @@ function updateTowerPreview() {
 // Wave Variables
 let currentWave = 0;
 const waves = [
-  { count: 4, spawnInterval: 2000, money: 100, speed: 7 },
-  { count: 6, spawnInterval: 1700, money: 200, speed: 10},
-  { count: 9, spawnInterval: 1500, money: 200, speed: 14},
-  { count: 11, spawnInterval: 1500, money: 300, speed: 18},
-  { count: 14, spawnInterval: 1500, money: 400, speed: 22}
+  { count: 4, spawnInterval: 2000, money: 100, speed: 7, health: 100 },
+  { count: 6, spawnInterval: 1700, money: 200, speed: 10, health: 125 },
+  { count: 9, spawnInterval: 1500, money: 200, speed: 12, health: 150 },
+  { count: 11, spawnInterval: 1200, money: 300, speed: 13, health: 175 },
+  { count: 14, spawnInterval: 1000, money: 400, speed: 14, health: 200 }
 ];
 
 // HUD Update Function
@@ -659,6 +660,7 @@ let waveSpawning = false;
 let zombiesToSpawn = 0;
 let spawnTimer = 0;
 let spawnInterval = 0;
+let zombieHealth = 100;
 
 // Wave Spawning Function 
 function spawnWave(wave) {
@@ -675,6 +677,7 @@ function spawnWave(wave) {
   spawnInterval = wave.spawnInterval / 1000;
   spawnTimer = 0;
   waveSpawning = true;
+  zombieHealth = wave.health;
 
   updateWaveHUD(currentWave + 1, waves.length);
 
@@ -695,7 +698,7 @@ function updateWaveSpawner(dt) {
   spawnTimer -= dt;
 
   if (spawnTimer <= 0) {
-    createZombie(pathCenters[0]);
+    createZombie(pathCenters[0], zombieHealth);
     zombiesToSpawn--;
 
     spawnTimer = spawnInterval;
