@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import { MTLLoader } from "three/examples/jsm/loaders/MTLLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js"
 
 // Scene and Renderer
 const scene = new THREE.Scene();
@@ -21,9 +22,13 @@ document.body.appendChild(renderer.domElement);
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
 camera.position.set(0, 25, 25);
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 0, 9.1);
-controls.update();
+// Fixed Orbital Controls
+const orbitalControls = new OrbitControls(camera, renderer.domElement);
+orbitalControls.target.set(0, 0, 9.1);
+orbitalControls.update();
+
+// Movement Controls
+const pointerLockControls = new PointerLockControls(camera, renderer.domElement);
 
 // Lights
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -461,6 +466,7 @@ let towerPreview = null;
 let stop = false;
 let fast = false;
 let timeScale = 1;
+let freeCamera = false;
 
 // Handle Placement Mode for Towers after Pressing "b"
 // and showing Tower Preview
@@ -503,6 +509,20 @@ window.addEventListener("keydown", (event) => {
       const from = new THREE.Vector3().copy(tower.mesh.position);
       from.y = 1.2;
       spawnProjectile(from, target);
+      break;
+    case 'c' :
+      freeCamera = !freeCamera;
+      if (freeCamera) {
+        pointerLockControls.unlock();
+        orbitalControls.enabled = false;
+        pointerLockControls.lock();
+      }
+      else {
+        pointerLockControls.unlock();
+        orbitalControls.enabled = true;
+        camera.position.set(0, 25, 25);
+        orbitalControls.target.set(0, 0, 9.1);
+      }
       break;
   }
 });
@@ -862,7 +882,6 @@ function updateProjectiles(dt) {
     // Use raycasting for continuous collision detection when moving fast
     let hit = false;
     if (dist > 0) {
-      const rayDir = dir.clone().normalize();
       const moveDistance = p.speed * dt;
       
       // Check if projectile would pass through target
@@ -938,10 +957,76 @@ function resetGame() {
   updateMoneyBar(currentMoney);
 }
 
+const moveBy = {
+  forward: false,
+  backward: false,
+  left: false,
+  right: false
+};
+
+// Key handling for arrow key controls
+window.addEventListener('keydown', (event) => {
+  switch (event.key) {
+    case "ArrowUp": 
+      moveBy.forward = true; 
+      break;
+    case "ArrowDown": 
+      moveBy.backward = true; 
+      break;
+    case "ArrowLeft": 
+      moveBy.left = true; 
+      break;
+    case "ArrowRight": 
+      moveBy.right = true; 
+      break;
+  }
+});
+
+window.addEventListener('keyup', (event) => {
+  switch (event.key) {
+    case "ArrowUp": 
+      moveBy.forward = false; 
+      break;
+    case "ArrowDown": 
+      moveBy.backward = false; 
+      break;
+    case "ArrowLeft": 
+      moveBy.left = false; 
+      break;
+    case "ArrowRight": 
+      moveBy.right = false; 
+      break;
+  }
+});
+
+// Arrow Keys Movement of the Camera
+function pointerControlsMovement(dt) {
+  const speed = 0.25;
+  
+  if (moveBy.forward) {
+    pointerLockControls.moveForward(speed);
+  }
+  if (moveBy.backward) {
+    pointerLockControls.moveForward(-speed);
+  }
+  if (moveBy.right) {
+    pointerLockControls.moveRight(speed);
+  }
+  if (moveBy.left) {
+    pointerLockControls.moveRight(-speed);
+  }
+}
+
 // Outer Animation Control Loop
 function animate() {
   requestAnimationFrame(animate);
-  const dt = clock.getDelta() * timeScale;
+  let dt = clock.getDelta() * timeScale;
+
+  if (freeCamera) {
+    pointerControlsMovement();
+  } else {
+    orbitalControls.update();
+  }
 
   updateWaveSpawner(dt);
   animateZombies(dt);
@@ -983,12 +1068,10 @@ function animate() {
     
   updateTowerPreview();
 
-  controls.update();
   renderer.render(scene, camera);
 }
 
 animate();
-controls.update();
 
 // Handler for Resizing Window
 window.addEventListener("resize", () => {
@@ -997,3 +1080,8 @@ window.addEventListener("resize", () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+renderer.domElement.addEventListener('click', () => {
+  if (freeCamera) {
+    pointerLockControls.lock();
+  }
+});
