@@ -339,8 +339,8 @@ function spawnProjectile(fromPos, targetZombie) {
   projectiles.push({
     mesh,
     target: targetZombie,
-    speed: 18,
-    life: 2.0,
+    speed: BASE_PROJECTILE_SPEED * timeScale,
+    life: BASE_PROJECTILE_LIFE / timeScale,
   });
 }
 
@@ -459,6 +459,7 @@ let towerPreview = null;
 
 let stop = false;
 let fast = false;
+let timeScale = 1;
 
 // Handle Placement Mode for Towers after Pressing "b"
 // and showing Tower Preview
@@ -491,12 +492,7 @@ window.addEventListener("keydown", (event) => {
       break;
     case 'f' :
       fast = !fast;
-      if (fast === true) {
-        speed = 15;
-      }
-      else {
-        speed = 5;
-      }
+      timeScale = fast ? 3 : 1;
       break;
     case 'p' :
       if (towers.length === 0) break;
@@ -638,6 +634,11 @@ function triggerGameOver() {
 }
 
 let speed = 0;
+let waveSpawning = false;
+let zombiesToSpawn = 0;
+let spawnTimer = 0;
+let spawnInterval = 0;
+
 // Wave Spawning Function 
 function spawnWave(wave) {
   gamePhase = "zombie"; 
@@ -648,26 +649,36 @@ function spawnWave(wave) {
   }
   speed = wave.speed;
 
-  let spawned = 0;
-  for (let i = 0; i < wave.count; i++) {
-    setTimeout(() => {
-      const zombieData = createZombie(pathCenters[0]);
-      spawned++;
+  // Set values to be used in updateWaveSpawner
+  zombiesToSpawn = wave.count;
+  spawnInterval = wave.spawnInterval / 1000;
+  spawnTimer = 0;
+  waveSpawning = true;
 
-      // Only after the first zombie mesh exists, start moving it
-      const checkReady = setInterval(() => {
-        if (zombieData.mesh) {
-          clearInterval(checkReady);
-        }
-      }, 10);
-
-    }, 
-    i * wave.spawnInterval); 
-  }
   updateWaveHUD(currentWave + 1, waves.length);
 
   currentMoney += wave.money;
   updateMoneyBar(currentMoney);
+}
+
+// Zombie creation
+function updateWaveSpawner(dt) {
+  if (!waveSpawning) {
+    return;
+  }
+  if (zombiesToSpawn <= 0) {
+    waveSpawning = false;
+    return;
+  }
+
+  spawnTimer -= dt;
+
+  if (spawnTimer <= 0) {
+    createZombie(pathCenters[0]);
+    zombiesToSpawn--;
+
+    spawnTimer = spawnInterval;
+  }
 }
 
 // Healthbar
@@ -699,18 +710,24 @@ window.addEventListener("keydown", (event) => {
 
 // Check handler to see if Wave is Complete
 function checkWaveComplete() {
-  let activeZombies = false;
+  if (zombies.length > 0) return;
 
-  for (let i = 0; i < zombies.length; i++) {
-    if (zombies[i].pathSegment < pathCenters.length - 1) {
-      activeZombies = true;
-      break; 
-    }
+  if (waveSpawning) return;
+
+  gamePhase = "building";
+  
+  // let activeZombies = false;
+
+  // for (let i = 0; i < zombies.length; i++) {
+  //   if (zombies[i].pathSegment < pathCenters.length - 1) {
+  //     activeZombies = true;
+  //     break; 
+  //   }
     
-    }
-    if (!activeZombies) { 
-      gamePhase = "building";  
-    }
+  //   }
+  //   if (!activeZombies) { 
+  //     gamePhase = "building";  
+  //   }
 }
 
 // Main Animation Loop for Zombies
@@ -749,6 +766,8 @@ function animateZombies(dt) {
 const TOWER_FIRE_COOLDOWN = 0.75; // seconds between shots
 const TOWER_RANGE = 100;          // how far towers can shoot
 const TOWER_COST = 100;
+const BASE_PROJECTILE_SPEED = 18;
+const BASE_PROJECTILE_LIFE = 2.0;
 
 function updateTowers(dt) {
   // Don't rely on gamePhase while debugging:
@@ -784,11 +803,13 @@ function updateTowers(dt) {
 
     if (!bestZombie) continue;
 
-    const from = new THREE.Vector3().copy(mesh.position);
-    from.y = 1.2;
-    spawnProjectile(from, bestZombie);
+    while (t.cooldown <= 0) {
+      const from = new THREE.Vector3().copy(mesh.position);
+      from.y = 1.2;
+      spawnProjectile(from, bestZombie);
 
-    t.cooldown = TOWER_FIRE_COOLDOWN;
+      t.cooldown += TOWER_FIRE_COOLDOWN;
+    }
   }
 }
 
@@ -816,8 +837,20 @@ function updateProjectiles(dt) {
     const dir = targetPos.clone().sub(p.mesh.position);
     const dist = dir.length();
 
-    if (dist < 0.35) {
-        p.target.health -= 25;
+    // Use raycasting for continuous collision detection when moving fast
+    let hit = false;
+    if (dist > 0) {
+      const rayDir = dir.clone().normalize();
+      const moveDistance = p.speed * dt;
+      
+      // Check if projectile would pass through target
+      if (moveDistance >= dist || dist < 0.35) {
+        hit = true;
+      }
+    }
+
+    if (hit) {
+      p.target.health -= 25;
 
       // Update health bar scale
       if (p.target.healthBar) {
@@ -826,16 +859,16 @@ function updateProjectiles(dt) {
       }
 
       if (p.target.health <= 0) {
-      // remove mesh
-      scene.remove(p.target.mesh);
+        // remove mesh
+        scene.remove(p.target.mesh);
 
-      // remove data safely
-      const idx = zombies.indexOf(p.target);
-      if (idx !== -1) zombies.splice(idx, 1);
+        // remove data safely
+        const idx = zombies.indexOf(p.target);
+        if (idx !== -1) zombies.splice(idx, 1);
 
-      // prevent double-kill weirdness
-      p.target.mesh = null;
-    }
+        // prevent double-kill weirdness
+        p.target.mesh = null;
+      }
       // "hit": just despawn for v1
       scene.remove(p.mesh);
       projectiles.splice(i, 1);
@@ -886,8 +919,9 @@ function resetGame() {
 // Outer Animation Control Loop
 function animate() {
   requestAnimationFrame(animate);
-  const dt = clock.getDelta();
+  const dt = clock.getDelta() * timeScale;
 
+  updateWaveSpawner(dt);
   animateZombies(dt);
   for (const z of zombies) {
     if (z.healthBar && z.mesh) {
